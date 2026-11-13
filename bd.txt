@@ -1,0 +1,114 @@
+# Guia de Uso do Banco de Dados (SmartKeys)
+
+Este documento explica como importar e utilizar os arquivos da camada de banco de dados (SQLite) no seu aplicativo React Native com Expo.
+
+## 1. Inicializando o Banco de Dados
+A primeira coisa que seu aplicativo deve fazer ao iniciar é criar o banco de dados e as tabelas (se ainda não existirem). Isso geralmente é feito no arquivo principal do app.
+
+```typescript
+import { useEffect } from 'react';
+import { inicializarBanco } from './caminho/para/banco/database/index';
+
+export default function App() {
+  useEffect(() => {
+    async function setupDatabase() {
+      try {
+        await inicializarBanco();
+        console.log('Banco de dados pronto!');
+      } catch (error) {
+        console.error('Erro ao inicializar o banco:', error);
+      }
+    }
+    setupDatabase();
+  }, []);
+
+  return (
+    // ... seus componentes visuais
+  );
+}
+```
+
+## 2. Inserindo Dados de Teste (Opcional)
+Se você estiver em ambiente de desenvolvimento e quiser popular o banco com alguns dados para testar a interface, pode usar o arquivo `seed.ts`.
+
+```typescript
+import { inserirDadosTeste } from './caminho/para/banco/database/seed';
+
+// Execute isso logo após `inicializarBanco()` no seu App.tsx
+await inserirDadosTeste('hash_de_senha_falsa_aqui');
+```
+
+## 3. Gerenciando Entidades (Repositórios)
+Todo o acesso aos dados deve ser feito através da pasta `repositories`. Nunca faça queries SQL diretamente nas telas do seu app. 
+
+### Trabalhando com Servidores (`servidorRepository.ts`)
+```typescript
+import { cadastrarServidor, listarServidores } from './caminho/para/banco/database/repositories/servidorRepository';
+
+// Exemplo: Listando todos os servidores
+const buscarServidores = async () => {
+  const servidores = await listarServidores();
+  console.log(servidores);
+};
+
+// Exemplo: Cadastrando um novo servidor
+const novoServidor = {
+  matricula: '2023001',
+  nome_completo: 'Carlos Almeida',
+  email: 'carlos@ifpi.edu.br',
+  senha_hash: 'hash123',
+  perfil: 'servidor',
+  ativo: 1
+};
+await cadastrarServidor(novoServidor);
+```
+
+### Trabalhando com Chaves (`chaveRepository.ts`)
+```typescript
+import { listarChavesDisponiveis } from './caminho/para/banco/database/repositories/chaveRepository';
+
+// Buscar apenas as chaves que não estão em uso no momento
+const chavesProntas = await listarChavesDisponiveis();
+```
+
+### Gerenciando Movimentações (`movimentacaoRepository.ts`)
+Este repositório contém a lógica de negócio principal do sistema de chaves.
+
+```typescript
+import { retirarChave, consultarHistorico } from './caminho/para/banco/database/repositories/movimentacaoRepository';
+
+// Exemplo: Realizando uma retirada de chave
+try {
+  const chaveId = 1;      // ID da chave que está sendo retirada
+  const servidorId = 10;  // ID do servidor pegando a chave
+  const qrCodeLido = 'QR-001'; 
+  
+  await retirarChave(chaveId, servidorId, qrCodeLido);
+  console.log('Chave retirada com sucesso!');
+} catch (error) {
+  // Trata os erros gerados pelas validações (ex: Chave já em uso, QR Code inválido)
+  console.error(error.message);
+}
+
+// Exemplo: Consultando o histórico de um dia específico
+const inicioDia = '2023-10-01T00:00:00.000Z';
+const fimDia = '2023-10-01T23:59:59.999Z';
+const relatorio = await consultarHistorico(inicioDia, fimDia);
+```
+
+## 4. Trabalhando com Tipagem (Types)
+Ao criar estados (`useState`) no React ou ao passar dados entre funções, lembre-se de importar as interfaces da pasta `types` para manter a segurança do TypeScript:
+
+```typescript
+import { Chave } from './caminho/para/banco/types/Chave';
+import { useState } from 'react';
+
+// Correto
+const [chaveSelecionada, setChaveSelecionada] = useState<Chave | null>(null);
+```
+
+## Resumo das Camadas
+- `connection.ts`: Configura a conexão e habilita chaves estrangeiras.
+- `schema.ts`: Define tabelas e regras estritas do banco (Triggers de segurança).
+- `types/`: Define os moldes dos objetos no TypeScript.
+- `repositories/`: Funções prontas para você importar nas suas Telas/Componentes para ler ou gravar dados.
